@@ -7,7 +7,7 @@ from collections import (
 )
 
 
-class TagTree:
+class ItemTree:
     def __init__(self, min_size=1, max_freq=1.0, sorted=True, format='yx'):
         self.min_size = min_size
         self.max_freq = max_freq
@@ -177,7 +177,7 @@ if __name__ == '__main__':
     print counts.most_common(50)
     
     
-    tt1 = TagTree(
+    it1 = ItemTree(
         max_freq=1.0,
         min_size=2,
         sorted=True,      # sorted or original ordering (the latter only makes sense with
@@ -185,7 +185,7 @@ if __name__ == '__main__':
         format='xy'       # xy, yx, x, y
     )
     
-    tt2 = TagTree(
+    it2 = ItemTree(
         max_freq=1.0,
         min_size=2,
         sorted=False,     # sorted or original ordering (the latter only makes sense with
@@ -193,7 +193,7 @@ if __name__ == '__main__':
         format='y'        # xy, yx, x, y
     )
     
-    tt3 = TagTree(
+    it3 = ItemTree(
         max_freq=1.0,
         min_size=2,
         sorted=True,      # sorted or original ordering (the latter only makes sense with
@@ -202,9 +202,9 @@ if __name__ == '__main__':
     )
     
     
-    clusters1 = tt1(tokenized)
-    clusters2 = tt2(tokenized)
-    clusters3 = tt3(tokenized)
+    clusters1 = it1(tokenized)
+    clusters2 = it2(tokenized)
+    clusters3 = it3(tokenized)
 
     print '========='
     for x in clusters1:
