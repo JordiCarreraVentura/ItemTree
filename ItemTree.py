@@ -1,10 +1,33 @@
 # -*- encoding: utf-8 -*-
 from __future__ import division
 
+import argparse
+import re
+import sys
+
 from collections import (
     Counter,
     defaultdict as deft
 )
+
+
+HELP_FREQ = 'Maximum frequency of any item to be used as a node in the tree.'
+HELP_PROB = 'Maximum probability of any item to be used as a node in the tree.'
+HELP_SIZE = 'Minimum size for a tree branch to be returned.'
+HELP_FORMAT = """Output format:
+\'xy\' = input strings + item trees;
+\'yx\' = item trees + input strings;
+\'x\' = input strings;
+\'y\' = item trees"""
+HELP_SORT = 'Disable automatic sorting by item tree.'
+HELP_PREPROC = 'Data preprocessing: word_normal | whitespace | non_alpha | non_alnum'  # sent_tokenize, word_normal, word_tokenize
+NON_ALPHA = re.compile(u'[A-Za-z]+')
+NON_ALNUM = re.compile(u'[A-Za-z0-9]+')
+WORD_NORMAL = re.compile(u'[A-Za-z0-9,\.;:\(\)\-\'\"]+')
+WORD_SEPARATOR = re.compile(u'[\.;:\(\)\-\'\"]')
+
+DEFAULT_PROB = 0.5
+DEFAULT_FREQ = 2
 
 
 class ItemTree:
@@ -106,113 +129,125 @@ class ItemTree:
             for e in elements:
                 out.append((tuple(history), position_by_element[tuple(e)], e))
         return out
+
+
+
+def config_display(args):
+    return '<ItemTree input_file="%s" <max_freq=%d max_prob=%f min_size=%d> <format=%s nosort=%s preproc=%s>>\n' % (
+        args.input_file, args.max_freq, args.max_prob,
+        args.min_size, args.format, args.nosort, args.preproc
+    )
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('input_file')
+    parser.add_argument(
+        '-f', '--max_freq',
+        type=int, default=2,
+        help=HELP_FREQ
+    )
+    parser.add_argument(
+        '-p', '--max_prob',
+        type=float, default=0.5,
+        help=HELP_PROB
+    )
+    parser.add_argument(
+        '-s', '--min_size',
+        type=int, default=2,
+        help=HELP_SIZE
+    )
+    parser.add_argument(
+        '--format',
+        default='xy',
+        help=HELP_FORMAT
+    )
+    parser.add_argument(
+        '--nosort',
+        action='store_true',
+        default=False,
+        help=HELP_SORT
+    )
+    parser.add_argument(
+        '--preproc',
+        default='non_alnum',
+        help=HELP_PREPROC
+    )
+    args = parser.parse_args()
+    if args.max_prob != DEFAULT_PROB \
+    and args.max_freq == DEFAULT_FREQ:
+        return args, args.max_prob
+    else:
+        return args, args.max_freq
+        
+
+
+def re_tokenize(words):
+    tokens = []
+    token = ''
+    for w in words:
+        for char in w:
+            if WORD_SEPARATOR.match(char):
+                if token:
+                    tokens.append(token)
+                tokens.append(char)
+                token = ''
+            elif char == ' ' and token:
+                tokens.append(token)
+                token = ''
+            else:
+                token += char
+        if token:        
+            tokens.append(token)
+            token = ''
+    return tokens
     
+
+def preproc(args):
+    lines = []
+    with open(args.input_file, 'rb') as rd:
+        for l in rd:
+            lines.append(l.decode('utf-8').strip())
+
+    #   word_normal | whitespace | non_alpha | non_alnum'  # sent_tokenize, word_normal, word_tokenize
+    if args.preproc == 'whitespace':
+        return [line.split() for line in lines]
+    elif args.preproc == 'non_alpha':
+        return [NON_ALPHA.findall(line) for line in lines]
+    elif args.preproc == 'non_alnum':
+        return [NON_ALNUM.findall(line) for line in lines]
+    elif args.preproc == 'word_normal':
+        return [
+            [w.lower() for w in re_tokenize(WORD_NORMAL.findall(line))]
+            for line in lines
+        ]
+    return lines
 
 
 if __name__ == '__main__':
-    
-    r = round
-    import random
-    from random import shuffle
-    tokenized = [
-        [1, 2, 3] + [random.randint(4, 1001) for i in range(7)],
-        [1, 2, 3] + [random.randint(4, 1001) for i in range(7)],
-        [1, 2, 3] + [random.randint(4, 1001) for i in range(7)],
-        [1, 2, 3] + [random.randint(4, 1001) for i in range(7)],
-        [1, 2, 3] + [random.randint(4, 1001) for i in range(7)],
-        [1] + [random.randint(4, 1001) for i in range(9)],
-        [1] + [random.randint(4, 1001) for i in range(9)],
-        [1] + [random.randint(4, 1001) for i in range(9)],
-        [1] + [random.randint(4, 1001) for i in range(9)],
-        [2] + [random.randint(4, 1001) for i in range(9)],
-        [2] + [random.randint(4, 1001) for i in range(9)],
-        [2] + [random.randint(4, 1001) for i in range(9)],
-        [2] + [random.randint(4, 1001) for i in range(9)],
-        [2] + [random.randint(4, 1001) for i in range(9)],
-        [3] + [random.randint(4, 1001) for i in range(9)],
-        [3] + [random.randint(4, 1001) for i in range(9)],
-        [3] + [random.randint(4, 1001) for i in range(9)],
-        [3] + [random.randint(4, 1001) for i in range(9)],
-        [3] + [random.randint(4, 1001) for i in range(9)],
-        [2, 3] + [random.randint(4, 1001) for i in range(8)],
-        [2, 3] + [random.randint(4, 1001) for i in range(8)],
-        [2, 3] + [random.randint(4, 1001) for i in range(8)],
-        [2, 3] + [random.randint(4, 1001) for i in range(8)],
-        [2, 3] + [random.randint(4, 1001) for i in range(8)],
-        [1, 3] + [random.randint(4, 1001) for i in range(8)],
-        [1, 3] + [random.randint(4, 1001) for i in range(8)],
-        [1, 3] + [random.randint(4, 1001) for i in range(8)],
-        [1, 3] + [random.randint(4, 1001) for i in range(8)],
-        [1, 3] + [random.randint(4, 1001) for i in range(8)],
-        [random.randint(4, 1001) for i in range(10)],
-        [random.randint(4, 1001) for i in range(10)],
-        [random.randint(4, 1001) for i in range(10)],
-        [random.randint(4, 1001) for i in range(10)],
-        [random.randint(4, 1001) for i in range(10)],
-        [random.randint(4, 1001) for i in range(10)],
-        [random.randint(4, 1001) for i in range(10)],
-        [random.randint(4, 1001) for i in range(10)],
-        [random.randint(4, 1001) for i in range(10)],
-        [random.randint(4, 1001) for i in range(10)]
-    ]
-    
-#     tokenized = [
-#         'a b c'.split(),
-#         'a b'.split(),
-#         'a'.split(),
-#         'a'.split(),
-#         'b c'.split(),
-#         'b'.split(),
-#         'a b'.split(),
-#         'a'.split(),
-#         'a c'.split(),
-#         'b a'.split(),
-#     ]
-    
-#     tokenized = shuffle_many(tokenized)
-    counts = Counter()
-    for x in tokenized:
-        print x
-        counts.update(x)
-    print counts.most_common(50)
-    
-    
-    it1 = ItemTree(
-        max_freq=1.0,
-        min_size=2,
-        sorted=True,      # sorted or original ordering (the latter only makes sense with
-                          # also asking for the Y in the output, see below).
-        format='xy'       # xy, yx, x, y
-    )
-    
-    it2 = ItemTree(
-        max_freq=1.0,
-        min_size=2,
-        sorted=False,     # sorted or original ordering (the latter only makes sense with
-                          # also asking for the Y in the output, see below).
-        format='y'        # xy, yx, x, y
-    )
-    
-    it3 = ItemTree(
-        max_freq=1.0,
-        min_size=2,
-        sorted=True,      # sorted or original ordering (the latter only makes sense with
-                          # also asking for the Y in the output, see below).
-        format='yx'        # xy, yx, x, y
-    )
-    
-    
-    clusters1 = it1(tokenized)
-    clusters2 = it2(tokenized)
-    clusters3 = it3(tokenized)
 
-    print '========='
-    for x in clusters1:
-        print x
-    print '========='
-    for x in clusters2:
-        print x
-    print '========='
-    for x in clusters3:
-        print x
+    args, max_freq = get_args()
     
+    if args.input_file:
+        
+        sys.stderr.write(config_display(args))
+        
+        tokenized = preproc(args)
+        
+        it = ItemTree(
+            max_freq=max_freq,
+            min_size=args.min_size,
+            sorted=not args.nosort,
+            format=args.format
+        )
+
+        clusters = it(tokenized)
+
+        for x in clusters:
+            print x
+
+    else:
+        exit('NotImplementedException')
+        rd = sys.stdin
+    
+
+
