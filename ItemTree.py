@@ -110,6 +110,16 @@ class ItemTree:
 
 
 if __name__ == '__main__':
+
+    #   If an input file is provided, read from file.
+    
+    #   Otherwise, ran on standard input.
+
+    import sys
+
+    for line in sys.stdin:
+        print line
+    
     
     r = round
     import random
