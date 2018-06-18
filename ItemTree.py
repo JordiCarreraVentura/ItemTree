@@ -4,6 +4,7 @@ from __future__ import division
 import argparse
 import re
 import sys
+from tqdm import tqdm
 
 from collections import (
     Counter,
@@ -12,7 +13,9 @@ from collections import (
 
 
 HELP_FREQ = 'Maximum frequency of any item to be used as a node in the tree.'
+HELP_MIN_FREQ = 'Minimum frequency of any item to be used as a node in the tree.'
 HELP_PROB = 'Maximum probability of any item to be used as a node in the tree.'
+HELP_MIN_PROB = 'Minimum probability of any item to be used as a node in the tree.'
 HELP_SIZE = 'Minimum size for a tree branch to be returned.'
 HELP_FORMAT = """Output format:
 \'xy\' = input strings + item trees;
@@ -21,32 +24,46 @@ HELP_FORMAT = """Output format:
 \'y\' = item trees"""
 HELP_SORT = 'Disable automatic sorting by item tree.'
 HELP_PREPROC = 'Data preprocessing: word_normal | whitespace | non_alpha | non_alnum'  # sent_tokenize, word_normal, word_tokenize
+HELP_ITEMTEXT = 'Return tree items as text instead of text/None tuples.'
+
 NON_ALPHA = re.compile(u'[A-Za-z]+')
 NON_ALNUM = re.compile(u'[A-Za-z0-9]+')
 WORD_NORMAL = re.compile(u'[A-Za-z0-9,\.;:\(\)\-\'\"]+')
 WORD_SEPARATOR = re.compile(u'[\.;:\(\)\-\'\"]')
 
 DEFAULT_PROB = 0.5
-DEFAULT_FREQ = 2
+DEFAULT_FREQ = 1000
+DEFAULT_MINPROB = 0.0
+DEFAULT_MINFREQ = 2
 
 
 class ItemTree:
-    def __init__(self, min_size=1, max_freq=1.0, sorted=True, format='yx'):
+    def __init__(
+        self,
+        min_size=1,
+        max_freq=0.5,
+        min_freq=2,
+        sorted=True,
+        format='yx',
+        itemtext=False
+    ):
         self.min_size = min_size
+        self.min_freq = min_freq
         self.max_freq = max_freq
         self.sorted = sorted
         self.format = format
+        self.itemtext = itemtext
     
-    def __call__(self, X):
+    def __call__(self, rX, X):
         clusters = [(True, [], X)]
         while True:
             if not [status for status, _, _ in clusters if status]:
                 break
             _clusters = []
-            for cluster in clusters:
+            for cluster in tqdm(clusters):
                 _clusters += self.__split(cluster)
             clusters = _clusters
-        return self.__to_out(X, clusters)
+        return self.__to_out(rX, X, clusters)
     
     def __split(self, cluster):
         status, history, X = cluster
@@ -72,11 +89,13 @@ class ItemTree:
     def __divide(self, cluster, F, I):
         status, history, X = cluster
         max_freq = self.__get_max_freq(X)
+        min_freq = self.__get_min_freq(X)
         best_feat = None
         for feat, freq in F.most_common():
             if freq >= max_freq:
                 continue
-            elif len(I[feat]) < self.min_size:
+            elif freq < min_freq \
+            or len(I[feat]) < self.min_size:
                 break
             best_feat = feat
             break
@@ -104,10 +123,17 @@ class ItemTree:
         else:
             return self.max_freq
     
-    def __to_out(self, X, clusters):
+    def __get_min_freq(self, X):
+        if isinstance(self.min_freq, float):
+            return len(X) * self.min_freq
+        else:
+            return self.min_freq
+    
+    def __to_out(self, rX, X, clusters):
         position_by_element = {tuple(x): i for i, x in enumerate(X)}
+        original_by_position = {i: x for i, x in enumerate(rX)}
         out = self.__flatten_and_add_initial_positions(
-            clusters, position_by_element
+            clusters, position_by_element, original_by_position
         )
         if not self.sorted:
             out.sort(key=lambda x: x[1])
@@ -122,34 +148,64 @@ class ItemTree:
         else:
             exit('FATAL: unrecognized argument for \'format\' parameter.')
     
-    def __flatten_and_add_initial_positions(self, clusters, position_by_element):
+    def __flatten_and_add_initial_positions(
+        self, clusters, position_by_element, original_by_position
+    ):
         out = []
         for cl in clusters:
             _, history, elements = cl
+            y = self.__make_itemtext(history)
             for e in elements:
-                out.append((tuple(history), position_by_element[tuple(e)], e))
+                result = (
+                    y,
+                    position_by_element[tuple(e)],    
+                    original_by_position[position_by_element[tuple(e)]]
+                )
+                out.append(result)
         return out
 
+    def __make_itemtext(self, history):
+        if self.itemtext:
+            y = []
+            for node in history:
+                if not node:
+                    y.append('*')
+                else:
+                    y.append(node)
+            return '/'.join(y)
+        else:
+            return tuple(history)
 
 
 def config_display(args):
-    return '<ItemTree input_file="%s" <max_freq=%d max_prob=%f min_size=%d> <format=%s nosort=%s preproc=%s>>\n' % (
-        args.input_file, args.max_freq, args.max_prob,
-        args.min_size, args.format, args.nosort, args.preproc
+    return '<ItemTree input_file="%s" <max_freq=%d max_prob=%f min_freq=%d min_prob=%f min_size=%d> <output=%s nosort=%s preproc=%s itemtext=%s>>\n' % (
+        args.input_file, args.max_freq, args.max_prob, args.min_freq, args.min_prob,
+        args.min_size, args.output, args.nosort, args.preproc,
+        args.itemtext
     )
 
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('input_file')
     parser.add_argument(
-        '-f', '--max_freq',
-        type=int, default=2,
+        '--max_freq',
+        type=int, default=1000,
         help=HELP_FREQ
     )
     parser.add_argument(
-        '-p', '--max_prob',
+        '--min_freq',
+        type=int, default=2,
+        help=HELP_MIN_FREQ
+    )
+    parser.add_argument(
+        '--max_prob',
         type=float, default=0.5,
         help=HELP_PROB
+    )
+    parser.add_argument(
+        '--min_prob',
+        type=float, default=0.0,
+        help=HELP_MIN_PROB
     )
     parser.add_argument(
         '-s', '--min_size',
@@ -157,9 +213,15 @@ def get_args():
         help=HELP_SIZE
     )
     parser.add_argument(
-        '--format',
+        '--output',
         default='xy',
         help=HELP_FORMAT
+    )
+    parser.add_argument(
+        '--itemtext',
+        action='store_true',
+        #default=False,
+        help=HELP_ITEMTEXT
     )
     parser.add_argument(
         '--nosort',
@@ -175,9 +237,17 @@ def get_args():
     args = parser.parse_args()
     if args.max_prob != DEFAULT_PROB \
     and args.max_freq == DEFAULT_FREQ:
-        return args, args.max_prob
+        maxim = args.max_prob
     else:
-        return args, args.max_freq
+        maxim = args.max_freq
+
+    if args.min_prob != DEFAULT_MINPROB \
+    and args.min_freq == DEFAULT_MINFREQ:
+        minim = args.min_prob
+    else:
+        minim = args.min_freq
+
+    return args, maxim, minim
         
 
 
@@ -210,37 +280,39 @@ def preproc(args):
 
     #   word_normal | whitespace | non_alpha | non_alnum'  # sent_tokenize, word_normal, word_tokenize
     if args.preproc == 'whitespace':
-        return [line.split() for line in lines]
+        return lines, [line.split() for line in lines]
     elif args.preproc == 'non_alpha':
-        return [NON_ALPHA.findall(line) for line in lines]
+        return lines, [NON_ALPHA.findall(line) for line in lines]
     elif args.preproc == 'non_alnum':
-        return [NON_ALNUM.findall(line) for line in lines]
+        return lines, [NON_ALNUM.findall(line) for line in lines]
     elif args.preproc == 'word_normal':
-        return [
+        return lines, [
             [w.lower() for w in re_tokenize(WORD_NORMAL.findall(line))]
             for line in lines
         ]
-    return lines
+    return lines, lines
 
 
 if __name__ == '__main__':
 
-    args, max_freq = get_args()
+    args, maxim, minim = get_args()
     
     if args.input_file:
         
         sys.stderr.write(config_display(args))
         
-        tokenized = preproc(args)
+        raw, tokenized = preproc(args)
         
         it = ItemTree(
-            max_freq=max_freq,
+            max_freq=maxim,
+            min_freq=minim,
             min_size=args.min_size,
             sorted=not args.nosort,
-            format=args.format
+            format=args.output,
+            itemtext=args.itemtext
         )
 
-        clusters = it(tokenized)
+        clusters = it(raw, tokenized)
 
         for x in clusters:
             print x
