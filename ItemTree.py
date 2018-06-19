@@ -2,6 +2,7 @@
 from __future__ import division
 
 import argparse
+import csv
 import re
 import sys
 from tqdm import tqdm
@@ -165,6 +166,11 @@ class ItemTree:
         return out
 
     def __make_itemtext(self, history):
+        if not [node for node in history if node]:
+            if self.itemtext:
+                return '*'
+            else:
+                return (None, )
         if self.itemtext:
             y = []
             for node in history:
@@ -184,9 +190,11 @@ def config_display(args):
         args.itemtext
     )
 
+
 def get_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument('input_file')
+    parser.add_argument('input_file', nargs='?')
+    parser.add_argument('output_file', nargs='?')
     parser.add_argument(
         '--max_freq',
         type=int, default=1000,
@@ -247,6 +255,9 @@ def get_args():
     else:
         minim = args.min_freq
 
+    if not args.output_file or sys.stdin:
+        args.itemtext = True
+
     return args, maxim, minim
         
 
@@ -273,10 +284,14 @@ def re_tokenize(words):
     
 
 def preproc(args):
-    lines = []
-    with open(args.input_file, 'rb') as rd:
-        for l in rd:
-            lines.append(l.decode('utf-8').strip())
+
+    if args.input_file:
+        lines = []
+        with open(args.input_file, 'rb') as rd:
+            for l in rd:
+                lines.append(l.decode('utf-8').strip())
+    else:
+        lines = [l.decode('utf-8').strip() for l in sys.stdin]
 
     #   word_normal | whitespace | non_alpha | non_alnum'  # sent_tokenize, word_normal, word_tokenize
     if args.preproc == 'whitespace':
@@ -293,33 +308,42 @@ def preproc(args):
     return lines, lines
 
 
+def write(args, clusters):
+
+    def save(clusters, out):
+        wrt = open(out, 'wb')
+        wrtr = csv.writer(wrt, delimiter="\t", quoting=csv.QUOTE_MINIMAL)
+        for row in clusters:
+            wrtr.writerow([field.encode('utf-8') for field in row])
+        wrt.close()
+    
+    def display(clusters):
+        for cl in clusters:
+            sys.stdout.write('%s\n' % "\t".join(cl))
+
+    if args.output_file:
+        save(clusters, args.output_file)
+    else:
+        display(clusters)
+
+
 if __name__ == '__main__':
 
     args, maxim, minim = get_args()
+
+    sys.stderr.write(config_display(args))
     
-    if args.input_file:
-        
-        sys.stderr.write(config_display(args))
-        
-        raw, tokenized = preproc(args)
-        
-        it = ItemTree(
-            max_freq=maxim,
-            min_freq=minim,
-            min_size=args.min_size,
-            sorted=not args.nosort,
-            format=args.output,
-            itemtext=args.itemtext
-        )
+    raw, tokenized = preproc(args)
 
-        clusters = it(raw, tokenized)
+    it = ItemTree(
+        max_freq=maxim,
+        min_freq=minim,
+        min_size=args.min_size,
+        sorted=not args.nosort,
+        format=args.output,
+        itemtext=args.itemtext
+    )
 
-        for x in clusters:
-            print x
+    clusters = it(raw, tokenized)
 
-    else:
-        exit('NotImplementedException')
-        rd = sys.stdin
-    
-
-
+    write(args, clusters)
