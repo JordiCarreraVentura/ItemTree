@@ -270,7 +270,7 @@ def re_tokenize(words):
             if WORD_SEPARATOR.match(char):
                 if token:
                     tokens.append(token)
-                tokens.append(char)
+                #tokens.append(char)
                 token = ''
             elif char == ' ' and token:
                 tokens.append(token)
