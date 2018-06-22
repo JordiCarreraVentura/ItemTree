@@ -22,20 +22,18 @@ The input and output file parameters are optional; if they are not provided, the
 
 | Parameter | Flag | Type | Description |
 |---|---|---|---|
-|input file | | positional, optional | |
-|output file | | positional, optional | |
-|maximum freq | `--max_freq` | optional | Maximum frequency of any item to be used as a node in the tree |
+|input file | | positional, optional | A file for the script to read input from. If no argument is not provided, the script will both read input from and write output to the terminal. Notice that no output file can be specified without specifying an input file (if only one file is specified, the script will interpret it as an input file). |
+|output file | | positional, optional | A file for the script to write output to. See also the previous point. |
+|maximum freq | `--max_freq` | optional | Maximum frequency of any item to be used as a node in the tree. |
 |maximum prob | `--max_prob` | optional | Maximum probability of any item to be used as a node in the tree. |
 |minimum freq | `--min_freq` | optional | Minimum frequency of any item to be used as a node in the tree. |
 |minimum prob |  `--min_prob`| optional | Minimum probability of any item to be used as a node in the tree. |
-|preprocessing method | `--preproc` | optional | Data preprocessing: `word_normal, whitespace, non_alpha, non_alnum` |
-|minimum cluster size | | | Minimum size for a tree branch to be returned. |
+|preprocessing method | `--preproc` | optional | Data preprocessing: `word_normal, whitespace, non_alpha, non_alnum`. `word_normal` = lowercase and tokenize, keep only numbers or words; `whitespace` = split on whitespace ; `non_alpha` = keep words only (no lowercasing) ; `non_alnum` = keep words or numbers (no lowercasing) |
+|minimum cluster size | `--min_size` | optional | Minimum size for a tree branch to be returned. |
+|maximum cluster size | `--max_size` | optional | Maximum size for a tree branch to be returned. |
 |covert trees from feature tuples to text | `--itemtext` | optional | Return tree items as text instead of text/None tuples. |
-|leave output in the same order as in the input | | optional | Disable automatic sorting by item tree. |
+|leave output in the same order as in the input | `--nosort` | optional | Disable automatic sorting by item tree. |
 |output format | `--output` | optional | Output format: `'xy'` = input strings + item trees; `'yx'` = item trees + input strings; `'x'` = input strings; `'y'` = item trees`|
-
-
-
 
 ### Advanced usage
 
