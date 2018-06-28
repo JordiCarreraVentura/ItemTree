@@ -339,7 +339,10 @@ def write(args, clusters):
     
     def display(clusters):
         for cl in clusters:
-            cl_txt = [cl[0].encode('utf-8'), cl[1].encode('utf-8')]
+            if len(cl) < 1:
+                cl_txt = [cl.encode('utf-8'), cl[1].encode('utf-8')]
+            else:
+                cl_txt = [cl.encode('utf-8'), ""]
             sys.stdout.write('%s\n' % "\t".join(cl_txt))
 
     if args.output_file:
