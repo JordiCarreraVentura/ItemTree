@@ -334,15 +334,17 @@ def write(args, clusters):
         wrt = open(out, 'wb')
         wrtr = csv.writer(wrt, delimiter="\t", quoting=csv.QUOTE_MINIMAL)
         for row in clusters:
+            if isinstance(row, basestring):
+                row = [row]
             wrtr.writerow([field.encode('utf-8') for field in row])
         wrt.close()
     
     def display(clusters):
         for cl in clusters:
-            if len(cl) < 1:
-                cl_txt = [cl.encode('utf-8'), cl[1].encode('utf-8')]
+            if isinstance(cl, basestring):
+                cl_txt = [cl.encode('utf-8')]
             else:
-                cl_txt = [cl.encode('utf-8'), ""]
+                cl_txt = [cl[0].encode('utf-8'), cl[1].encode('utf-8')]
             sys.stdout.write('%s\n' % "\t".join(cl_txt))
 
     if args.output_file:
