@@ -105,15 +105,24 @@ class ItemTree:
         max_freq = self.__get_max_freq(X)
         min_freq = self.__get_min_freq(X)
         best_feat = None
+        feat_ranks = []
+        half = int(len(X) / 2)
         for feat, freq in F.most_common():
             if freq >= max_freq:
                 continue
             elif freq < min_freq \
             or len(I[feat]) < self.min_size:
                 break
-            best_feat = feat
-            break
-        if best_feat:
+            specif = len(X) - len(I[feat])
+            if specif < half:
+                feat_rank = half - specif
+            else:
+                feat_rank = specif - half
+            feat_ranks.append((feat_rank, feat))
+        feat_ranks.sort()
+        feat_ranks = [f for r, f in feat_ranks if r >= 0]
+        if feat_ranks:
+            best_feat = feat_ranks[0]
             a, b = self.__a_or_b(history, X, I, best_feat)
             return best_feat, [a, b]
         else:
