@@ -102,7 +102,7 @@ class ItemTree:
     
     def __divide(self, cluster, F, I):
         status, history, X = cluster
-        max_freq = self.__get_max_freq(X)
+        max_freq = self.__get_max_freq(history != [], X)
         min_freq = self.__get_min_freq(X)
         best_feat = None
         feat_ranks = []
@@ -140,9 +140,12 @@ class ItemTree:
         b = (True, history + [None], bX)
         return a, b
     
-    def __get_max_freq(self, X):
+    def __get_max_freq(self, has_history, X):
         if isinstance(self.max_freq, float):
-            return len(X) * self.max_freq
+            if not has_history:
+                return len(X) * self.max_freq
+            else:
+                return len(X)
         else:
             return self.max_freq
     
