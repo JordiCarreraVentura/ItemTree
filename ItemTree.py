@@ -3,6 +3,7 @@ from __future__ import division
 
 import argparse
 import csv
+import math
 import re
 import sys
 from tqdm import tqdm
@@ -57,6 +58,22 @@ class ItemTree:
         self.sorted = sorted
         self.format = format
         self.itemtext = itemtext
+        self.P = deft(float)
+    
+    def __update_priors(self, clusters):
+        avg_p = deft(list)
+        for _, _, X in clusters:
+            mass = 0
+            p = Counter()
+            for x in X:
+                for f in x:
+                    mass += 1
+                    p[f] += 1
+            for feat, freq in p.most_common():
+                avg_p[feat].append(freq / mass)
+        self.P = {
+            feat: sum(avgs) / len(avgs) for feat, avgs in avg_p.items()
+        }
     
     def __call__(self, rX, X):
         clusters = [(True, [], X)]
@@ -64,6 +81,7 @@ class ItemTree:
             if not [status for status, _, _ in clusters if status]:
                 break
             _clusters = []
+            self.__update_priors(clusters)
             for cluster in tqdm(clusters):
                 _clusters += self.__split(cluster)
             clusters = _clusters
@@ -78,8 +96,8 @@ class ItemTree:
         features_to_deduct = set(history)
         over_max_size = True
         while over_max_size:
-            F, I = self.__count(X, features_to_deduct)
-            bf, clusters = self.__divide(cluster, F, I)
+            P, F, I = self.__count(X, features_to_deduct)
+            bf, clusters = self.__divide(cluster, P, F, I)
             if not bf:
                 over_max_size = False
             elif len(clusters[0]) > self.max_size \
@@ -91,16 +109,22 @@ class ItemTree:
     
     def __count(self, X, features_to_deduct):
         F = Counter()
+        P = Counter()
         I = deft(list)
+        mass = 0
         for i, x in enumerate(X):
             all_features = set(x)
             new_features = all_features - features_to_deduct
             for f in new_features:
                 F[f] += 1
+                P[f] += 1
+                mass += 1
                 I[f].append(i)
-        return F, I
+        for w, freq in P.items():
+            P[w] = freq / mass
+        return P, F, I
     
-    def __divide(self, cluster, F, I):
+    def __divide(self, cluster, P, F, I):
         status, history, X = cluster
         max_freq = self.__get_max_freq(history != [], X)
         min_freq = self.__get_min_freq(X)
@@ -113,13 +137,16 @@ class ItemTree:
             elif freq < min_freq \
             or len(I[feat]) < self.min_size:
                 break
-            specif = len(X) - len(I[feat])
-            if specif < half:
-                feat_rank = half - specif
-            else:
-                feat_rank = specif - half
+            feat_rank = -(math.log(P[feat]) * (P[feat] / self.P[feat]))
             feat_ranks.append((feat_rank, feat))
-        feat_ranks.sort()
+        feat_ranks.sort(reverse=True)
+#             specif = len(X) - len(I[feat])
+#             if specif < half:
+#                 feat_rank = half - specif
+#             else:
+#                 feat_rank = specif - half
+#             feat_ranks.append((feat_rank, feat))
+#         feat_ranks.sort()
         feat_ranks = [f for r, f in feat_ranks if r >= 0]
         if feat_ranks:
             best_feat = feat_ranks[0]
@@ -188,6 +215,7 @@ class ItemTree:
                     original_by_position[position_by_element[tuple(e)]]
                 )
                 out.append(result)
+        out.sort(key=lambda x: (x[0], x[2]))
         return out
 
     def __make_itemtext(self, history):
