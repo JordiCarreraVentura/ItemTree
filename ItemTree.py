@@ -3,6 +3,7 @@ from __future__ import division
 
 import argparse
 import csv
+import random
 import re
 import sys
 from tqdm import tqdm
@@ -57,6 +58,7 @@ class ItemTree:
         self.sorted = sorted
         self.format = format
         self.itemtext = itemtext
+        self.cross_cluster_penalty = dict([])
     
     def __call__(self, rX, X):
         clusters = [(True, [], X)]
@@ -64,10 +66,34 @@ class ItemTree:
             if not [status for status, _, _ in clusters if status]:
                 break
             _clusters = []
+            self.__update_cross_cluster_penalties(clusters)
             for cluster in tqdm(clusters):
                 _clusters += self.__split(cluster)
             clusters = _clusters
         return self.__to_out(rX, X, clusters)
+    
+    def __update_cross_cluster_penalties(self, clusters):
+        V = set([])
+        penalties = dict([])
+        for _, _, X in clusters:
+            for x in X:
+                V.update(x)
+        for v in V:
+            penalties[v] = [0.0]
+        if len(clusters) > 100:
+            clusters = random.sample(clusters, 100)
+        for _, _, X in clusters:
+            F = Counter()
+            for x in X:
+                F.update(set(x))
+            mass = sum(F.values())
+            if mass:
+                for v in V:
+                    penalties[v].append(F[v] / mass)
+        self.cross_cluster_penalty = {
+            feat: sum(_penalties) / len(_penalties)
+            for feat, _penalties in penalties.items()
+        }
     
     def __split(self, cluster):
         status, history, X = cluster
@@ -91,7 +117,7 @@ class ItemTree:
     
     def __count(self, X, features_to_deduct):
         F = Counter()
-        I = deft(list)
+        I = deft(list)       
         for i, x in enumerate(X):
             all_features = set(x)
             new_features = all_features - features_to_deduct
@@ -118,8 +144,13 @@ class ItemTree:
                 feat_rank = half - specif
             else:
                 feat_rank = specif - half
-            feat_ranks.append((feat_rank, feat))
+#             print feat, len(X), len(I[feat]), feat_rank / 100, self.cross_cluster_penalty[feat]
+            feat_ranks.append(
+                (feat_rank / 100 * (1 - self.cross_cluster_penalty[feat]), feat)
+            )
         feat_ranks.sort()
+#         print feat_ranks[:20]
+#         print
         feat_ranks = [f for r, f in feat_ranks if r >= 0]
         if feat_ranks:
             best_feat = feat_ranks[0]
