@@ -13,6 +13,8 @@ from collections import (
     defaultdict as deft
 )
 
+from copy import deepcopy as cp
+
 
 HELP_FREQ = 'Maximum frequency of any item to be used as a node in the tree.'
 HELP_MIN_FREQ = 'Minimum frequency of any item to be used as a node in the tree.'
@@ -73,26 +75,24 @@ class ItemTree:
         return self.__to_out(rX, X, clusters)
     
     def __update_cross_cluster_penalties(self, clusters):
+        if self.cross_cluster_penalty.keys() \
+        and random.random() >= 0.1:
+            return
+        n = 100
         V = set([])
-        penalties = dict([])
-        for _, _, X in clusters:
+        penalties = deft(set)
+        if len(clusters) > n:
+            _clusters = random.sample(clusters, n)
+        else:
+            _clusters = clusters
+            n = len(clusters)
+        for i, (_, _, X) in enumerate(_clusters):
             for x in X:
-                V.update(x)
-        for v in V:
-            penalties[v] = [0.0]
-        if len(clusters) > 100:
-            clusters = random.sample(clusters, 100)
-        for _, _, X in clusters:
-            F = Counter()
-            for x in X:
-                F.update(set(x))
-            mass = sum(F.values())
-            if mass:
-                for v in V:
-                    penalties[v].append(F[v] / mass)
+                for w in x:
+                    penalties[w].add(i)
         self.cross_cluster_penalty = {
-            feat: sum(_penalties) / len(_penalties)
-            for feat, _penalties in penalties.items()
+            feat: len(feat_clusters) / n
+            for feat, feat_clusters in penalties.items()
         }
     
     def __split(self, cluster):
@@ -117,7 +117,7 @@ class ItemTree:
     
     def __count(self, X, features_to_deduct):
         F = Counter()
-        I = deft(list)       
+        I = deft(list)
         for i, x in enumerate(X):
             all_features = set(x)
             new_features = all_features - features_to_deduct
@@ -141,16 +141,19 @@ class ItemTree:
                 break
             specif = len(X) - len(I[feat])
             if specif < half:
-                feat_rank = half - specif
+                _feat_rank = half - specif
             else:
-                feat_rank = specif - half
-#             print feat, len(X), len(I[feat]), feat_rank / 100, self.cross_cluster_penalty[feat]
-            feat_ranks.append(
-                (feat_rank / 100 * (1 - self.cross_cluster_penalty[feat]), feat)
-            )
+                _feat_rank = specif - half
+            try:
+                feat_rank = (
+                    _feat_rank / 100 * (1 - self.cross_cluster_penalty[feat]), feat
+                )
+            except KeyError:
+                feat_rank = (
+                    _feat_rank / 100, feat
+                )
+            feat_ranks.append(feat_rank)
         feat_ranks.sort()
-#         print feat_ranks[:20]
-#         print
         feat_ranks = [f for r, f in feat_ranks if r >= 0]
         if feat_ranks:
             best_feat = feat_ranks[0]
