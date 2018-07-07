@@ -190,10 +190,12 @@ class ItemTree:
             return self.min_freq
     
     def __to_out(self, rX, X, clusters):
-        position_by_element = {tuple(x): i for i, x in enumerate(X)}
+        positions_by_element = deft(set)
+        for i, x in enumerate(X):
+            positions_by_element[tuple(x)].add(i)
         original_by_position = {i: x for i, x in enumerate(rX)}
         out = self.__flatten_and_add_initial_positions(
-            clusters, position_by_element, original_by_position
+            clusters, positions_by_element, original_by_position
         )
         if not self.sorted:
             out.sort(key=lambda x: x[1])
@@ -209,20 +211,22 @@ class ItemTree:
             exit('FATAL: unrecognized argument for \'format\' parameter.')
     
     def __flatten_and_add_initial_positions(
-        self, clusters, position_by_element, original_by_position
+        self, clusters, positions_by_element, original_by_position
     ):
-        out = []
+        out = dict([])
+        c = 0
         for cl in clusters:
             _, history, elements = cl
             y = self.__make_itemtext(history)
             for e in elements:
-                result = (
-                    y,
-                    position_by_element[tuple(e)],    
-                    original_by_position[position_by_element[tuple(e)]]
-                )
-                out.append(result)
-        return out
+                for i in positions_by_element[tuple(e)]:
+                    result = (y, i, original_by_position[i])
+                    try:
+                        out[result]
+                    except Exception:
+                        out[result] = c
+                        c += 1
+        return [x for x, y in sorted(out.items(), key=lambda (a, b): b)]
 
     def __make_itemtext(self, history):
         if not [node for node in history if node]:
