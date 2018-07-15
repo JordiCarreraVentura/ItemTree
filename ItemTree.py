@@ -61,6 +61,7 @@ class ItemTree:
         self.format = format
         self.itemtext = itemtext
         self.cross_cluster_penalty = dict([])
+        self.is_feature = deft(bool)
     
     def __call__(self, rX, X):
         clusters = [(True, [], X)]
@@ -95,6 +96,15 @@ class ItemTree:
             for feat, feat_clusters in penalties.items()
         }
     
+    def __init_features(self, history, X, F):
+        if history:
+            return
+        max_freq = self.__get_max_freq(X)
+        min_freq = self.__get_min_freq(X)
+        for feat, freq in F.most_common():
+            if freq >= min_freq and freq <= max_freq:
+                self.is_feature[feat] = True
+    
     def __split(self, cluster):
         status, history, X = cluster
         if not status:
@@ -105,6 +115,7 @@ class ItemTree:
         over_max_size = True
         while over_max_size:
             F, I = self.__count(X, features_to_deduct)
+            self.__init_features(history, X, F)
             bf, clusters = self.__divide(cluster, F, I)
             if not bf:
                 over_max_size = False
@@ -128,16 +139,13 @@ class ItemTree:
     
     def __divide(self, cluster, F, I):
         status, history, X = cluster
-        max_freq = self.__get_max_freq(history != [], X)
-        min_freq = self.__get_min_freq(X)
         best_feat = None
         feat_ranks = []
         half = int(len(X) / 2)
         for feat, freq in F.most_common():
-            if freq >= max_freq:
+            if not self.is_feature[feat]:
                 continue
-            elif freq < min_freq \
-            or len(I[feat]) < self.min_size:
+            elif len(I[feat]) < self.min_size:
                 break
             specif = len(X) - len(I[feat])
             if specif < half:
@@ -145,8 +153,11 @@ class ItemTree:
             else:
                 _feat_rank = specif - half
             try:
+                decimal_rank = _feat_rank / 100
+                cross_cluster_penalty = (1 - self.cross_cluster_penalty[feat])
                 feat_rank = (
-                    _feat_rank / 100 * (1 - self.cross_cluster_penalty[feat]), feat
+                    decimal_rank * cross_cluster_penalty,
+                    feat
                 )
             except KeyError:
                 feat_rank = (
@@ -174,12 +185,9 @@ class ItemTree:
         b = (True, history + [None], bX)
         return a, b
     
-    def __get_max_freq(self, has_history, X):
+    def __get_max_freq(self, X):
         if isinstance(self.max_freq, float):
-            if not has_history:
-                return len(X) * self.max_freq
-            else:
-                return len(X)
+            return len(X) * self.max_freq
         else:
             return self.max_freq
     
